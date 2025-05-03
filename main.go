@@ -19,8 +19,8 @@ var (
   idleTimeout  = flag.Duration("idle-timeout", 10*time.Minute, "idle time before shutdown")
   startTimeout = flag.Duration("start-timeout", 30*time.Second, "max time to wait for startup")
 
-  lastAccess time.Time
-  mu         sync.Mutex
+  lastAccess   time.Time
+  lastAccessMu sync.Mutex
 
   starting   bool
   startMutex sync.Mutex
@@ -83,9 +83,9 @@ func idleMonitor() {
   defer ticker.Stop()
 
   for range ticker.C {
-    mu.Lock()
+    lastAccessMu.Lock()
     idle := time.Since(lastAccess) > *idleTimeout
-    mu.Unlock()
+    lastAccessMu.Unlock()
     if idle && isRunning() {
       log.Println("Idle timeout reached. Shutting down service...")
       stopService()
@@ -124,9 +124,9 @@ func handleTCPProxy(client net.Conn) {
   defer target.Close()
 
   update := func() {
-    mu.Lock()
+    lastAccessMu.Lock()
     lastAccess = time.Now()
-    mu.Unlock()
+    lastAccessMu.Unlock()
   }
 
   tcClient := &trackingConn{Conn: client, updateAccess: update}
@@ -180,9 +180,9 @@ func main() {
     go func(c net.Conn) {
       defer c.Close()
 
-      mu.Lock()
+      lastAccessMu.Lock()
       lastAccess = time.Now()
-      mu.Unlock()
+      lastAccessMu.Unlock()
 
       startMutex.Lock()
       isStarting := starting
