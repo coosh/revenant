@@ -79,8 +79,10 @@ func waitForReady() {
 }
 
 func idleMonitor() {
-	for {
-		time.Sleep(1 * time.Minute)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
 		mu.Lock()
 		idle := time.Since(lastAccess) > *idleTimeout
 		mu.Unlock()
@@ -161,6 +163,10 @@ func main() {
 
 			if !isRunning() && *startCmd != "" {
 				ensureStarted()
+				if !isRunning() {
+					log.Printf("Service still unavailable after startup. Dropping connection.")
+					return
+				}
 			}
 
 			handleTCPProxy(c)
