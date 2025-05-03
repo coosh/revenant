@@ -93,6 +93,27 @@ func idleMonitor() {
 	}
 }
 
+type trackingConn struct {
+	net.Conn
+	updateAccess func()
+}
+
+func (t *trackingConn) Read(b []byte) (int, error) {
+	n, err := t.Conn.Read(b)
+	if n > 0 {
+		t.updateAccess()
+	}
+	return n, err
+}
+
+func (t *trackingConn) Write(b []byte) (int, error) {
+	n, err := t.Conn.Write(b)
+	if n > 0 {
+		t.updateAccess()
+	}
+	return n, err
+}
+
 func handleTCPProxy(client net.Conn) {
 	defer client.Close()
 	target, err := net.Dial("tcp", *targetAddr)
@@ -102,8 +123,17 @@ func handleTCPProxy(client net.Conn) {
 	}
 	defer target.Close()
 
-	go io.Copy(target, client)
-	io.Copy(client, target)
+	update := func() {
+		mu.Lock()
+		lastAccess = time.Now()
+		mu.Unlock()
+	}
+
+	tcClient := &trackingConn{Conn: client, updateAccess: update}
+	tcTarget := &trackingConn{Conn: target, updateAccess: update}
+
+	go io.Copy(tcTarget, tcClient)
+	io.Copy(tcClient, tcTarget)
 }
 
 func ensureStarted() {
