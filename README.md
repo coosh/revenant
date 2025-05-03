@@ -21,6 +21,14 @@ It’s useful when running things like `stable-diffusion-webui` and `ollama` on 
 3. Proxies traffic once ready
 4. If no traffic hits it for a while, it runs a stop command
 
+## Build
+
+Very simple app so just need to build binary:
+
+```bash
+go build -o revenant
+```
+
 ## Flags
 
 ```bash
